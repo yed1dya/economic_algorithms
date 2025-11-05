@@ -33,12 +33,13 @@ def egalitarian_allocation(values: list[list[float]], precision: int = 2) -> lis
     V = np.array(values, dtype=float)
     n, m = V.shape
 
-    # create X, the solution (allocations) matrix
+    # create X, the solution (allocations) matrix. And z, the target variable
     X = cp.Variable((n, m), nonneg=True)
     z = cp.Variable()
 
     # vector of total utility (allocation * value) for each agent
     utilities = cp.sum(cp.multiply(V, X), axis=1)
+
     # constraints: sum of each column must be 1, each utility at least z
     constraints = [cp.sum(X, axis=0) == 1, utilities >= z]
 
@@ -46,16 +47,20 @@ def egalitarian_allocation(values: list[list[float]], precision: int = 2) -> lis
     prob = cp.Problem(objective, constraints)
     prob.solve(solver=cp.ECOS)
 
+    # verify
     if prob.status not in ("optimal", "optimal_inaccurate"):
         raise RuntimeError(f"Solver failed with status {prob.status}")
-
     if np.any(X.value < -1e-6) or np.any(X.value > 1 + 1e-6):
         raise RuntimeError("Invalid solution: variable outside [0,1].")
+
+    # extract solution to verify and clean up solution (fix tiny floating-point errors)
     X_opt = np.clip(X.value, 0, 1)
 
+    # verify
     if not np.allclose(X_opt.sum(axis=0), 1, atol=1e-7):
         raise RuntimeError("Invalid allocation: columns do not sum to 1.")
 
+    # round to required precision and return
     return np.round(X_opt, decimals=precision).tolist()
 
 
@@ -83,18 +88,30 @@ def leximin_egalitarian_allocation(values: list[list[float]], precision: int = 2
     if not values or not all(len(row) == len(values[0]) for row in values):
         raise ValueError("Input must be a non-empty rectangular matrix.")
 
+    # convert to numpy array for convenience
     V = np.array(values, dtype=float)
     n, m = V.shape
 
+    # create X, the solution (allocations) matrix
     X = cp.Variable((n, m), nonneg=True)
+
+    # vector of total utility (allocation * value) for each agent
     utilities = cp.sum(cp.multiply(V, X), axis=1)
+
+    # main constraint: sum of each column must be 1
     base_constraints = [cp.sum(X, axis=0) == 1]
+
+    # z-values and constraints we save from each iteration
     fixed_z = np.zeros(n)
     fixed_z_constraints = []
 
-    # Enumerate every subset of size i for 1 to n
+    # Enumerate every subset of size i for 1...n
     for i in range(n):
+        # create variable for this iteration
         z = cp.Variable()
+
+        # set constraints:
+        # base constraints + all the constraints from previous iterations + new constraints for this iteration
         constraints = (base_constraints + fixed_z_constraints.copy() +
                        [cp.sum(utilities[list(S)]) >= z for S in itertools.combinations(range(n), i + 1)])
 
@@ -104,20 +121,24 @@ def leximin_egalitarian_allocation(values: list[list[float]], precision: int = 2
         if prob.status not in ("optimal", "optimal_inaccurate"):
             raise RuntimeError(f"Tier {i} solve failed: {prob.status}")
 
+        # fix most recent z value and add to saved constraints
         fixed_z[i] = float(z.value)
         for S in itertools.combinations(range(n), i + 1):
             fixed_z_constraints.append(cp.sum(utilities[list(S)]) >= fixed_z[i])
 
+    # extract solution to verify
     X_raw = X.value
     if X_raw is None:
         raise RuntimeError("Solver returned no solution for X.")
     if np.any(X_raw < -1e-6) or np.any(X_raw > 1 + 1e-6):
         raise RuntimeError("Invalid solution: entries outside [0,1] by >1e-6.")
-
-    X_opt = np.clip(X_raw, 0, 1)
-    if not np.allclose(X_opt.sum(axis=0), 1, atol=1e-7):
+    if not np.allclose(X_raw.sum(axis=0), 1, atol=1e-7):
         raise RuntimeError("Invalid allocation: columns do not sum to 1.")
 
+    # clean up solution (fix tiny floating-point errors)
+    X_opt = np.clip(X_raw, 0, 1)
+
+    # round to required precision and return
     return np.round(X_opt, decimals=precision).tolist()
 
 
@@ -164,21 +185,34 @@ def get_different_solutions(n=2, m=3, lower=None, upper=None, diff=0.0, max_iter
     random.seed(seed)
     while similar and count < max_iter:
         count += 1
+        # create random values matrix
         vals = [[random.randint(lower[i], upper[i]) for _ in range(m)] for i in range(n)]
+
+        # get both solutions
         sol1 = egalitarian_allocation(vals)
         sol2 = leximin_egalitarian_allocation(vals)
+
+        # compare
         for i in range(n):
             for j in range(m):
                 if abs(sol1[i][j] - sol2[i][j]) > diff:
-                    similar = True
+                    similar = False
                     break
+            if not similar:
+                break
     return vals if count < max_iter else None
 
 
 if __name__ == '__main__':
-    example = [[0, 3, 0, 5, 3], [11, 10, 13, 11, 7], [14, 15, 16, 14, 19]]
-    for line in format_allocation(egalitarian_allocation(example)):
-        print(line)
-    print()
-    for line in format_allocation(leximin_egalitarian_allocation(example)):
-        print(line)
+    # print(get_different_solutions(n=3, m=5, lower=[0, 7, 14], upper=[6, 13, 20], diff=0.5, max_iter=1000))
+    examples = [[[0, 3, 0, 5, 3], [11, 10, 13, 11, 7], [14, 15, 16, 14, 19]],
+                [[3, 0, 0, 0, 1], [8, 11, 11, 7, 11], [15, 19, 19, 19, 18]]]
+    for example in examples:
+        print("\ntesting:\n", example)
+        print("egalitarian allocation:")
+        for line in format_allocation(egalitarian_allocation(example)):
+            print(line)
+        print("\nleximin_egalitarian_allocation:")
+        for line in format_allocation(leximin_egalitarian_allocation(example)):
+            print(line)
+
