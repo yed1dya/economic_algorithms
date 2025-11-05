@@ -1,3 +1,7 @@
+"""
+Yedidya Even-chen
+Used chatGPT-5 for debugging and cvxpy tutorial
+"""
 import cvxpy as cp
 import numpy as np
 import itertools
