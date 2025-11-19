@@ -206,7 +206,9 @@ def get_different_solutions(n=2, m=3, lower=None, upper=None, diff=0.0, max_iter
 if __name__ == '__main__':
     # print(get_different_solutions(n=3, m=5, lower=[0, 7, 14], upper=[6, 13, 20], diff=0.5, max_iter=1000))
     examples = [[[0, 3, 0, 5, 3], [11, 10, 13, 11, 7], [14, 15, 16, 14, 19]],
-                [[3, 0, 0, 0, 1], [8, 11, 11, 7, 11], [15, 19, 19, 19, 18]]]
+                [[3, 0, 0, 0, 1], [8, 11, 11, 7, 11], [15, 19, 19, 19, 18]],
+                [[75, 25], [25, 75]],
+                [[6.94, 2.34], [25, 75]]]
     for example in examples:
         print("\ntesting:\n", example)
         print("egalitarian allocation:")
