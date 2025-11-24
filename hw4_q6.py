@@ -8,13 +8,13 @@ def envy_free_room_allocation(valuations: list[list[float]], rent: float, mode: 
     Finds a room allocation maximizing total value and calculates envy-free prices.
 
     Args:
-        valuations: Matrix where valuations[i][j] is Player i's value for Room j.
-        rent: Total rent to be divided among the rooms.
-        mode: 0 = Allow negative prices. Maximize Minimum Utility.
-              1 = Prices must be >= 0. Maximize Minimum Utility.
-              2 = Prices must be > 0. Sequential Optimization:
-                  (1) Maximize 'z' (Positivity Margin).
-                  (2) Maximize Minimum Utility (subject to optimal z).
+        valuations: matrix where valuations[i][j] is player i's value for room j.
+        rent: total rent to be divided among the rooms.
+        mode: 0 = allow negative prices. Maximize minimum utility.
+              1 = prices must be >= 0. Maximize minimum utility.
+              2 = prices must be > 0. Sequential optimization:
+                  (1) Maximize 'z' (positivity margin).
+                  (2) Maximize minimum utility (subject to optimal z).
         zero: custom "zero" value, to account for floating-point errors.
 
     Returns:
@@ -61,15 +61,15 @@ def envy_free_room_allocation(valuations: list[list[float]], rent: float, mode: 
         Player 2 gets Room 3 (Value: 2300.00), pays 1950.00
         Player 3 gets Room 2 (Value: 2000.00), pays 1950.00
     """
-    val_matrix = np.array(valuations)
-    num_players, num_rooms = val_matrix.shape
+    val_matrix = np.array(valuations)  # cast to numpy array
+    num_players, num_rooms = val_matrix.shape  # get number of players and rooms
 
     if num_players != num_rooms:
         raise ValueError("Number of players must equal number of rooms for one-to-one assignment.")
 
     # Find room-player allocation using bipartite graph
     B = nx.Graph()
-    B.add_nodes_from(range(num_players), bipartite=0)  # Add players as nodes. 0 is the name of the player nodes set.
+    B.add_nodes_from(range(num_players), bipartite=0)  # Add players as nodes.
     B.add_nodes_from(range(num_players, num_players + num_rooms), bipartite=1)  # Add rooms as nodes.
     #  Note: 0 and 1 are just standard names. Could just the same be 'A' and 'B'.
 
